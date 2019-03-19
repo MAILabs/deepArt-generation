@@ -16,9 +16,14 @@ from keras import backend as K
 import numpy as np
 from keras.losses import mse, binary_crossentropy
 import os
+import config
+import utils
 import matplotlib.pyplot as plt
+from PIL import Image
+
 #https://wiseodd.github.io/techblog/2016/12/10/variational-autoencoder/
 #https://distill.pub/2016/deconv-checkerboard/
+
 
 class VAE():
     def __init__(self, name='VAE_1', use_mse=True):
@@ -47,9 +52,14 @@ class VAE():
         self.nf4 = 32
         self.nf5 = 16
         self.nf6 = 8
-        if not os.path.exists('../model/{}'.format(self.name)):
-            os.makedirs('../model/{}'.format(self.name))
-            os.makedirs('../model/{}/images'.format(self.name))
+        self.epoch = 0
+        self.model_path = os.path.join(config.models_dir,name,'etc')
+        self.images_path = os.path.join(config.models_dir, name, 'images')
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
+        if not os.path.exists(self.images_path):
+            os.makedirs(self.images_path)
+
         ## Placeholders
         self.vae_input = None
         self.vae_output = None
@@ -75,6 +85,14 @@ class VAE():
         self.vae.add_loss(vae_loss)
         self.vae.compile(optimizer=self.optimizer)
 
+        self.epoch, _ = utils.find_max_file(os.path.join(self.model_path,"vae_ep_"),".h5")
+        if self.epoch is None:
+            self.epoch=0
+        else:
+            self.encoder.load_weights(filepath=os.path.join(self.model_path,"encoder_ep_{}.h5".format(self.epoch)))
+            self.decoder.load_weights(filepath=os.path.join(self.model_path, "decoder_ep_{}.h5".format(self.epoch)))
+            self.vae.load_weights(
+                filepath=os.path.join(self.model_path, "vae_ep_{}.h5".format(self.epoch)))
 
     # reparameterization trick
     # instead of sampling from Q(z|X), sample eps = N(0,I)
@@ -966,12 +984,11 @@ class VAE():
         return z
 
 
-    def train(self, data, epochs = 100, batch_size = 32, save_intervals = 50,
-              init_train=True, start_epoch=0, cycle=1):
-        
-        print('Training  %s model with following architecture:' %self.name)
+    def summary(self):
+        print('Using %s model with following architecture:' %self.name)
         print(self.vae.summary())
-        
+
+    def train(self, data, epochs = 100, batch_size = 32, save_intervals = 50, sample_intervals = 50, hi_sample_intervals = 50):
         final_images_stacked = data.astype('float32')
         print('Training size: %d' %len(final_images_stacked))
         domain = np.min(final_images_stacked), np.max(final_images_stacked)
@@ -980,13 +997,10 @@ class VAE():
         else:
             X_train = final_images_stacked
 
-        if init_train:
-            epoch_iterator = np.arange(start=0, stop=epochs+1)
-        else:
-            epoch_iterator = np.arange(start=start_epoch+1, stop=start_epoch+epochs+1)
+        epoch_iterator = np.arange(start=self.epoch+1, stop=self.epoch+epochs+1)
 
         history_list = []
-        for epoch in epoch_iterator:
+        for self.epoch in epoch_iterator:
 
             # ---------------------
             #  Train Variational Autoencoder 
@@ -1000,35 +1014,43 @@ class VAE():
 
             vae_history = self.vae.train_on_batch(x=imgs, y=None)
             # Print the progress
-            print ("Epoch: %d %s loss: %f" % (epoch, self.name, vae_history))
+            print ("Epoch: %d %s loss: %f" % (self.epoch, self.name, vae_history))
             # save the progress in history object
-            history_list.append("Epoch: %d %s loss: %f" % (epoch, self.name, vae_history))
+            history_list.append("Epoch: %d %s loss: %f" % (self.epoch, self.name, vae_history))
             #If last epoch save models and generate 10 images in full mode:
-            if epoch == cycle*epochs:
+            if self.epoch % hi_sample_intervals == 0:
                 final_noises = np.random.normal(0, 1, (10, self.latent_dim))
                 final_gen_images = self.decoder.predict(final_noises)
                 if not domain == (0,1):
+                    final_gen_images_int = self.unscale(y=final_gen_images, x=final_images_stacked, out_range=(0, 255)).astype(np.uint8)
                     final_gen_images = self.unscale(y = final_gen_images, x = final_images_stacked, out_range=(0,1))
                 for i in range(10):
                     plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
-                    plt.savefig("../model/%s/images/epoch_%d_final_generated_images_%d.jpg" % (self.name, epoch, i))
+                    plt.savefig(os.path.join(self.images_path,"hi_plt_images_ep%d_%d.jpg" % (self.epoch, i)))
+                    im = Image.fromarray(final_gen_images_int[i])
+                    im.save(os.path.join(self.images_path,"hi_raw_images_ep%d_%d.jpg" % (self.epoch, i)))
 
-            if epoch % save_intervals == 0:
+            if self.epoch % sample_intervals == 0:
                 #create 2x2 images
-                self.save_imgs(epoch = epoch, final_images_stacked=final_images_stacked, domain=domain)
-                #save last weights
-                self.encoder.save_weights(filepath = "../model/{}/epoch_".format(self.name) + str(epoch) + "_encoder.h5")
-                self.decoder.save_weights(filepath = "../model/{}/epoch_".format(self.name) + str(epoch) + "_decoder.h5")
-                self.vae.save_weights(filepath = "../model/{}/epoch_".format(self.name) + str(epoch) + "_vae.h5")
+                self.save_imgs(epoch = self.epoch, final_images_stacked=final_images_stacked, domain=domain)
 
-        if not os.path.exists('../model/{}/history.txt'.format(self.name)):
-            with open('../model/{}/history.txt'.format(self.name), 'w+') as f:
+            if self.epoch % save_intervals == 0:
+                #save last weights
+                self.save_weights()
+
+        if not os.path.exists(os.path.join(self.model_path,'history.txt'.format(self.name))):
+            with open(os.path.join(self.model_path,'history.txt'.format(self.name)), 'w+') as f:
                 for item in history_list:
                     f.write("%s\n" % item)
         else:
-            with open('../model/{}/history.txt'.format(self.name), 'a+') as f:
+            with open(os.path.join(self.model_path,'history.txt'.format(self.name)), 'a+') as f:
                 for item in history_list:
                     f.write("%s\n" % item)
+
+    def save_weights(self):
+        self.encoder.save_weights(filepath=os.path.join(self.model_path,"encoder_ep_{}.h5".format(self.epoch)))
+        self.decoder.save_weights(filepath=os.path.join(self.model_path,"decoder_ep_{}.h5".format(self.epoch)))
+        self.vae.save_weights(filepath=os.path.join(self.model_path,"vae_ep_{}.h5".format(self.epoch)))
 
     def save_imgs(self, epoch, final_images_stacked, domain):
         r, c = 2, 2
@@ -1046,5 +1068,5 @@ class VAE():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,:])
                 axs[i,j].axis("off")
                 cnt += 1
-        fig.savefig("../model/%s/image_%d.jpg" % (self.name, epoch))
+                fig.savefig(os.path.join(self.images_path, "image_%d.jpg" % epoch))
         plt.close(fig)

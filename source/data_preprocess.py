@@ -13,6 +13,7 @@ from skimage.transform import resize
 import os
 import gc
 from itertools import compress
+import config
 
 def resize_helper(img, min_vals = [128,128]):
     """
@@ -27,15 +28,17 @@ def expander(x):
     """
     return np.expand_dims(x, axis=0)
     
-def preprocess(genre_or_style, min_vals = [128,128]):
+def preprocess(genre_or_style, min_vals = [128,128], n=None):
     """
     loads images from a path, resizes them to a certain range and finally stacks them
     """
     
-    path = "../data/{}/".format(genre_or_style)
+    path = config.datafile(genre_or_style)
     #list all images in ../data/'genre_or_style'/img1.jpg
     
     all_images = [x for x in os.listdir(path) if x.endswith(".jpg") | x.endswith(".png") | x.endswith(".jpeg")]
+    if n is not None:
+        all_images = all_images[0:n]
     all_images = [os.path.join(path, image) for image in all_images]
     all_images_ndarray = list(map(io.imread, all_images))
     

@@ -24,16 +24,24 @@ import numpy as np
 #matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import os
+import config
+import utils
+from PIL import Image
+
 ## Build class for DCGAN
 
 class DCGAN():
     def __init__(self, name='DCGAN_1'):
         assert any(name.upper() in item for item in ['DCGAN_1', 'DCGAN_2', 'DCGAN_3']), 'Inserted <name>: "{}" is not provided in the list [DCGAN_1, DCGAN_2, DCGAN_3]'.format(name)
         self.name = name.upper()
-        if not os.path.exists('../model/{}'.format(self.name)):
-            os.makedirs('../model/{}'.format(self.name))
-            os.makedirs('../model/{}/images'.format(self.name))
+        self.model_path = os.path.join(config.models_dir,name,'etc')
+        self.images_path = os.path.join(config.models_dir, name, 'images')
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
+        if not os.path.exists(self.images_path):
+            os.makedirs(self.images_path)
         # Input image shape
+        self.epoch = 0
         self.rows = 128
         self.cols = 128
         self.channels = 3
@@ -74,8 +82,14 @@ class DCGAN():
             
         #Build stacked DCGAN
         self.stacked_G_D = self.build_dcgan()
-        
-        
+
+        self.epoch, _ = utils.find_max_file(os.path.join(self.model_path,"generator_ep_"),".h5")
+        if self.epoch is None:
+            self.epoch=0
+        else:
+            self.generator.load_weights(filepath=os.path.join(self.model_path,"generator_ep_{}.h5".format(self.epoch)))
+            self.discriminator.load_weights(filepath=os.path.join(self.model_path, "discriminator_ep_{}.h5".format(self.epoch)))
+
         ## Class functions to build discriminator and generator (networks):
         ########################## Architectures regarding the DCGAN ##########################
         ###################################### Model 1 ######################################
@@ -431,13 +445,11 @@ class DCGAN():
 
         return z
 
-
-    def train(self, data, epochs = 100, batch_size = 10, save_intervals = 20,
-              init_train=True, start_epoch=0, cycle=1):
-        
-        print('Training  %s model with following architecture:' %self.name)
+    def summary(self):
+        print('Model %s has the following architecture:' % self.name)
         print(self.stacked_G_D.summary())
-        
+
+    def train(self, data, epochs = 100, batch_size = 10, save_intervals = 20, sample_intervals = 20, hi_sample_intervals = 20):
         final_images_stacked = data.astype('float32')
         domain = np.min(final_images_stacked), np.max(final_images_stacked)
         if not domain == (-1,1) and self.name == 'DCGAN_1':
@@ -451,13 +463,10 @@ class DCGAN():
         valid = np.ones(shape = (batch_size, 1))
         fake = np.zeros(shape = (batch_size, 1))
         
-        if init_train:
-            epoch_iterator = np.arange(start=0, stop=epochs+1)
-        else:
-            epoch_iterator = np.arange(start=start_epoch+1, stop=start_epoch+epochs+1)
+        epoch_iterator = np.arange(start=self.epoch+1, stop=self.epoch+epochs+1)
         
         history_list = []
-        for epoch in epoch_iterator:
+        for self.epoch in epoch_iterator:
 
             # ---------------------
             #  Train Variational Autoencoder
@@ -486,17 +495,17 @@ class DCGAN():
             g_loss = self.stacked_G_D.train_on_batch(noise, valid)
 
             # Print the progress
-            print ("Epoch: %d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
-            history_list.append("Epoch: %d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+            print ("Epoch: %d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (self.epoch, d_loss[0], 100*d_loss[1], g_loss))
+            history_list.append("Epoch: %d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (self.epoch, d_loss[0], 100*d_loss[1], g_loss))
             # If at save interval => save generated image samples + model weights
-            if epoch % save_intervals == 0:
-                #create 2x2 images
-                self.save_imgs(epoch = epoch, final_images_stacked = final_images_stacked, domain=domain)
-                self.generator.save_weights(filepath = "../model/{}/epoch_".format(self.name) + str(epoch) + "_generator.h5")
-                self.discriminator.save_weights(filepath = "../model/{}/epoch_".format(self.name) + str(epoch) + "_discriminator.h5")
+            if self.epoch % save_intervals == 0:
+                self.save_weights()
 
-            #If last epoch save models and generate 10 images in full mode:
-            if epoch == cycle*epochs:
+            if self.epoch % sample_intervals == 0:
+                #create 2x2 images
+                self.save_imgs(epoch = self.epoch, final_images_stacked = final_images_stacked, domain=domain)
+
+            if self.epoch % hi_sample_intervals == 0:
                 final_noises = np.random.normal(0, 1, (10, self.latent_dim))
                 final_gen_images = self.generator.predict(final_noises)
                 if not domain == (-1,1) and self.name == 'DCGAN_1':
@@ -504,8 +513,14 @@ class DCGAN():
                     #else is sowieso in output range (0,1) wegen sigmoid
                 for i in range(10):
                     plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
-                    plt.savefig("../model/%s/images/epoch_%d_final_generated_images_%d.jpg" % (self.name, epoch, i))
+                    plt.savefig(os.path.join(self.images_path,"final_images_plt_ep%d_%d.jpg" % (self.epoch, i)))
+                    im = Image.fromarray(final_gen_images[i])
+                    im.save(self.images_path, "final_images_raw_ep%d_%d.jpg" % (self.epoch, i))
 
+    def save_weights(self):
+        self.generator.save_weights(filepath=os.path.join(self.model_path,"generator_ep_{}.h5".format(self.epoch)))
+        self.discriminator.save_weights(
+            filepath=os.path.join(self.model_path,"discriminator_ep_{}.h5".format(self.epoch)))
 
     def save_imgs(self, epoch, final_images_stacked, domain):
         r, c = 2, 2
@@ -523,5 +538,5 @@ class DCGAN():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,:])
                 axs[i,j].axis("off")
                 cnt += 1
-        fig.savefig("../model/%s/image_%d.jpg" % (self.name, epoch))
+        fig.savefig(os.path.join(self.images_path,"image_%d.jpg" % epoch))
         plt.close(fig)
