@@ -14,6 +14,7 @@ import os
 import gc
 from itertools import compress
 import config
+import random
 
 def resize_helper(img, min_vals = [128,128]):
     """
@@ -28,20 +29,36 @@ def expander(x):
     """
     return np.expand_dims(x, axis=0)
     
-def preprocess(genre_or_style, min_vals = [128,128], n=None):
+def preprocess(genre_or_style, min_vals = [128,128], n=None,shuffle=True):
     """
     loads images from a path, resizes them to a certain range and finally stacks them
     """
     
     path = config.datafile(genre_or_style)
     #list all images in ../data/'genre_or_style'/img1.jpg
-    
+
+    print("Reading images...")
+
     all_images = [x for x in os.listdir(path) if x.endswith(".jpg") | x.endswith(".png") | x.endswith(".jpeg")]
-    if n is not None:
-        all_images = all_images[0:n]
-    all_images = [os.path.join(path, image) for image in all_images]
-    all_images_ndarray = list(map(io.imread, all_images))
-    
+    if shuffle:
+        random.shuffle(all_images)
+
+    all_images_ndarray = []
+    i=0
+    for x in all_images:
+        if n is not None and i>=n:
+            break
+        try:
+            im = io.imread(os.path.join(path,x))
+            shape = im.shape
+            if shape[0] >= min_vals[0] and shape[1] >= min_vals[1] and shape[2] == 3:
+                all_images_ndarray.append(im)
+                i += 1
+        except:
+            print("Cannot read {}".format(x))
+
+    print("Using {} images out of {}".format(len(all_images_ndarray),len(all_images)))
+
     show_image = False
     
     if show_image:
@@ -61,19 +78,6 @@ def preprocess(genre_or_style, min_vals = [128,128], n=None):
     ## possible enhancement: take only image which are at leat 128x128 ? if smaller and "upsizing"
     ## might lead to bad result?! 
     
-    cnt = 0
-    filter_list = [None] * len(all_images_ndarray)
-    
-    for el in all_images_ndarray:
-        shape = el.shape
-        if shape[0] >= min_vals[0] and shape[1] >= min_vals[1] and shape[2] == 3:
-            filter_list[cnt] = True
-        else:
-            filter_list[cnt] = False
-        cnt += 1
-        
-    ## filter only those images having at least shape 256x256 and 3 as third dimension
-    all_images_ndarray = list(compress(all_images_ndarray, filter_list))
     # transform that each image has the shape (256,256,3)
     all_images_ndarray_resized = list(map(resize_helper, all_images_ndarray))
     

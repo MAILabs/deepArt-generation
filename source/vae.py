@@ -1022,8 +1022,8 @@ class VAE():
                 final_noises = np.random.normal(0, 1, (10, self.latent_dim))
                 final_gen_images = self.decoder.predict(final_noises)
                 if not domain == (0,1):
-                    final_gen_images_int = self.unscale(y=final_gen_images, x=final_images_stacked, out_range=(0, 255)).astype(np.uint8)
                     final_gen_images = self.unscale(y = final_gen_images, x = final_images_stacked, out_range=(0,1))
+                final_gen_images_int = (final_gen_images*256.0).astype(np.uint8)
                 for i in range(10):
                     plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
                     plt.savefig(os.path.join(self.images_path,"hi_plt_images_ep%d_%d.jpg" % (self.epoch, i)))

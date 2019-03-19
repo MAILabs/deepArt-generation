@@ -510,11 +510,14 @@ class DCGAN():
                 final_gen_images = self.generator.predict(final_noises)
                 if not domain == (-1,1) and self.name == 'DCGAN_1':
                     final_gen_images = self.unscale(y = final_gen_images, x = final_images_stacked, out_range=(-1,1))
+                    final_get_images_int = ((final_gen_images+1)*127).astype(np.uint8)
                     #else is sowieso in output range (0,1) wegen sigmoid
+                else:
+                    final_gen_images_int = (final_gen_images*255).astype(np.uint8)
                 for i in range(10):
                     plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
                     plt.savefig(os.path.join(self.images_path,"final_images_plt_ep%d_%d.jpg" % (self.epoch, i)))
-                    im = Image.fromarray(final_gen_images[i])
+                    im = Image.fromarray(final_gen_images_int[i])
                     im.save(self.images_path, "final_images_raw_ep%d_%d.jpg" % (self.epoch, i))
 
     def save_weights(self):

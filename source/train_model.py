@@ -66,7 +66,7 @@ if __name__ == "__main__":
     else:
             model = "VAE_2"
 
-    epochs = 1000
+    epochs = 100000
     batch_size= 16
     save_intervals = 100
 
