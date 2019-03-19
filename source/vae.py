@@ -19,7 +19,6 @@ import os
 import config
 import utils
 import matplotlib.pyplot as plt
-from PIL import Image
 
 #https://wiseodd.github.io/techblog/2016/12/10/variational-autoencoder/
 #https://distill.pub/2016/deconv-checkerboard/
@@ -53,6 +52,7 @@ class VAE():
         self.nf5 = 16
         self.nf6 = 8
         self.epoch = 0
+        self.domain = (0,1)
         self.model_path = os.path.join(config.models_dir,name,'etc')
         self.images_path = os.path.join(config.models_dir, name, 'images')
         if not os.path.exists(self.model_path):
@@ -86,10 +86,15 @@ class VAE():
         self.vae.compile(optimizer=self.optimizer)
 
         self.epoch, _ = utils.find_max_file(os.path.join(self.model_path,"vae_ep_"),".h5")
-        if self.epoch is None:
-            self.epoch=0
+
+        self.load_epoch(self.epoch)
+
+    def load_epoch(self,epoch):
+        if epoch is None:
+            self.epoch = 0
         else:
-            self.encoder.load_weights(filepath=os.path.join(self.model_path,"encoder_ep_{}.h5".format(self.epoch)))
+            self.epoch = epoch
+            self.encoder.load_weights(filepath=os.path.join(self.model_path, "encoder_ep_{}.h5".format(self.epoch)))
             self.decoder.load_weights(filepath=os.path.join(self.model_path, "decoder_ep_{}.h5".format(self.epoch)))
             self.vae.load_weights(
                 filepath=os.path.join(self.model_path, "vae_ep_{}.h5".format(self.epoch)))
@@ -974,8 +979,8 @@ class VAE():
 
         return y
 
-    def unscale(self, y, x, out_range = (0, 1)):
-        domain = np.min(x), np.max(x)
+    def unscale(self, y, out_range = (0, 1), domain = None):
+        if domain is None: domain = self.domain
         # undo b)
         z = (y - (out_range[1] + out_range[0]) / 2) / (out_range[1] - out_range[0])
         # undo a)
@@ -991,8 +996,8 @@ class VAE():
     def train(self, data, epochs = 100, batch_size = 32, save_intervals = 50, sample_intervals = 50, hi_sample_intervals = 50):
         final_images_stacked = data.astype('float32')
         print('Training size: %d' %len(final_images_stacked))
-        domain = np.min(final_images_stacked), np.max(final_images_stacked)
-        if not domain == (0,1):
+        self.domain = np.min(final_images_stacked), np.max(final_images_stacked)
+        if not self.domain == (0,1):
             X_train = self.scale(x = data.astype('float32'), out_range=(0,1))
         else:
             X_train = final_images_stacked
@@ -1019,16 +1024,12 @@ class VAE():
             history_list.append("Epoch: %d %s loss: %f" % (self.epoch, self.name, vae_history))
             #If last epoch save models and generate 10 images in full mode:
             if self.epoch % hi_sample_intervals == 0:
-                final_noises = np.random.normal(0, 1, (10, self.latent_dim))
-                final_gen_images = self.decoder.predict(final_noises)
-                if not domain == (0,1):
-                    final_gen_images = self.unscale(y = final_gen_images, x = final_images_stacked, out_range=(0,1))
+                final_gen_images = self.generate_random_images(10)
                 final_gen_images_int = (final_gen_images*256.0).astype(np.uint8)
                 for i in range(10):
                     plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
                     plt.savefig(os.path.join(self.images_path,"hi_plt_images_ep%d_%d.jpg" % (self.epoch, i)))
-                    im = Image.fromarray(final_gen_images_int[i])
-                    im.save(os.path.join(self.images_path,"hi_raw_images_ep%d_%d.jpg" % (self.epoch, i)))
+                    utils.save_image(final_gen_images_int[i],os.path.join(self.images_path,"hi_raw_images_ep%d_%d.jpg" % (self.epoch, i)))
 
             if self.epoch % sample_intervals == 0:
                 #create 2x2 images
@@ -1047,6 +1048,19 @@ class VAE():
                 for item in history_list:
                     f.write("%s\n" % item)
 
+    def get_vector_representation(self,imgs):
+        return self.encoder.predict(imgs)
+
+    def generate_images(self,noise):
+        final_gen_images = self.decoder.predict(noise)
+        if not self.domain == (0, 1):
+            final_gen_images = self.unscale(y=final_gen_images, out_range=(0, 1))
+        return final_gen_images
+
+    def generate_random_images(self,n):
+        noise = np.random.normal(0, 1, (n, self.latent_dim))
+        return self.generate_images(noise)
+
     def save_weights(self):
         self.encoder.save_weights(filepath=os.path.join(self.model_path,"encoder_ep_{}.h5".format(self.epoch)))
         self.decoder.save_weights(filepath=os.path.join(self.model_path,"decoder_ep_{}.h5".format(self.epoch)))
@@ -1054,13 +1068,7 @@ class VAE():
 
     def save_imgs(self, epoch, final_images_stacked, domain):
         r, c = 2, 2
-        noise = np.random.normal(0, 1, (r * c, self.latent_dim))
-        gen_imgs = self.decoder.predict(noise)
-
-        # Rescale images 0 - 1
-        if not domain == (0,1):
-            gen_imgs = self.unscale(y = gen_imgs, x = final_images_stacked, out_range=(0,1))
-
+        gen_imgs = self.generate_random_images(r * c)
         fig, axs = plt.subplots(r, c)
         cnt = 0
         for i in range(r):

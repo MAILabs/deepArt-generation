@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 import os
 import config
 import utils
-from PIL import Image
 
 ## Build class for DCGAN
 
@@ -517,8 +516,7 @@ class DCGAN():
                 for i in range(10):
                     plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
                     plt.savefig(os.path.join(self.images_path,"final_images_plt_ep%d_%d.jpg" % (self.epoch, i)))
-                    im = Image.fromarray(final_gen_images_int[i])
-                    im.save(self.images_path, "final_images_raw_ep%d_%d.jpg" % (self.epoch, i))
+                    utils.save_image(final_gen_images_int[i],os.path.join(self.images_path, "final_images_raw_ep%d_%d.jpg" % (self.epoch, i)))
 
     def save_weights(self):
         self.generator.save_weights(filepath=os.path.join(self.model_path,"generator_ep_{}.h5".format(self.epoch)))

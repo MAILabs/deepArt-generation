@@ -6,6 +6,7 @@
 """
 
 import glob
+from PIL import Image
 
 def find_max_file(pattern,ext):
     max=None
@@ -15,3 +16,8 @@ def find_max_file(pattern,ext):
             max = int(n)
     if max is None: return None,None
     else: return max,(pattern+str(max)+ext)
+
+
+def save_image(im,fn):
+    img = Image.fromarray(im)
+    img.save(fn)
