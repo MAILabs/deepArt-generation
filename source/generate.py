@@ -13,7 +13,7 @@ import numpy as np
 import random
 
 parser = argparse.ArgumentParser(description="Art Image Generator")
-parser.add_argument('--model',dest='model',default=config.model,help='model to use')
+parser.add_argument('--model',dest='model',default=config.model,help='model to use',choices=core.possible_models)
 parser.add_argument('--filename',dest='filename',default='img_{N}.jpg',help='image filename to use, use {N} for number, {EP} for epoch, {D} for descriptor')
 parser.add_argument('--dest',dest='path',default='.',help='destination directory, defaults to .')
 parser.add_argument('--num',dest='n',default=1,type=int,help='number of images to generate')

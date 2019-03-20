@@ -51,7 +51,8 @@ def preprocess(genre_or_style, min_vals = [128,128], n=None,shuffle=True):
         try:
             im = io.imread(os.path.join(path,x))
             shape = im.shape
-            if shape[0] >= min_vals[0] and shape[1] >= min_vals[1] and shape[2] == 3:
+            r = shape[0] / shape[1]
+            if shape[0] >= min_vals[0] and shape[1] >= min_vals[1] and shape[2] == 3 and r>config.min_img_ratio and r<=config.max_img_ratio:
                 all_images_ndarray.append(im)
                 i += 1
         except:

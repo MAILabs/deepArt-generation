@@ -12,6 +12,8 @@ import numpy as np
 from vae import VAE
 from dcgan import DCGAN
 
+possible_models = ['DCGAN_1', 'DCGAN_2', 'DCGAN_3', 'VAE_1', 'VAE_2', 'VAE_3','VAE_4']
+
 def create_model(model=config.model):
     if model == 'DCGAN_1':
         my_model = DCGAN(name='DCGAN_1')

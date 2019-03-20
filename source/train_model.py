@@ -13,11 +13,10 @@ import sys
 import gc
 import core
 import os
+import argparse
 
+def main(model, epochs, batch_size, save_intervals):
 
-def main(epochs, batch_size, save_intervals):
-
-    model = config.model
     my_model = core.create_model(model)
 
     print("Python main program for generating images using {}".format(model))
@@ -31,16 +30,14 @@ if __name__ == "__main__":
     """
     This script runs the main training programm for the model. Note Model either has to be
     """
-    ### If user inserts via shell console
-    if len(sys.argv) == 2:
-            model = sys.argv[1]
-    else:
-            model = "VAE_2"
 
-    epochs = 100000
-    batch_size= 16
-    save_intervals = 100
+    parser = argparse.ArgumentParser(description='Art Network Trainer')
+    parser.add_argument('--model', dest='model', default=config.model, help='model to use',
+                        choices=core.possible_models)
+    parser.add_argument('--epochs', dest='epochs', default=10000, help='number of epochs', type=int)
+    parser.add_argument('--batch-size', dest='batch_size', default=16, help='minibatch size', type=int)
+    parser.add_argument('--save-intervals', dest='save_intervals', default=500, help='save intervals', type=int)
 
-    ### If no arguments were inserted when calling this script
+    args = parser.parse_args()
 
-    main(epochs=epochs, batch_size=batch_size, save_intervals=save_intervals)
+    main(model=args.model, epochs=args.epochs, batch_size=args.batch_size, save_intervals=args.save_intervals)
