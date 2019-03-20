@@ -99,6 +99,9 @@ class VAE():
             self.vae.load_weights(
                 filepath=os.path.join(self.model_path, "vae_ep_{}.h5".format(self.epoch)))
 
+    def available_epochs(self):
+        return utils.pattern_files(os.path.join(self.model_path,"vae_ep_"),".h5")
+
     # reparameterization trick
     # instead of sampling from Q(z|X), sample eps = N(0,I)
     # z = z_mean + sqrt(var)*eps
@@ -1027,13 +1030,15 @@ class VAE():
                 final_gen_images = self.generate_random_images(10)
                 final_gen_images_int = (final_gen_images*256.0).astype(np.uint8)
                 for i in range(10):
-                    plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
-                    plt.savefig(os.path.join(self.images_path,"hi_plt_images_ep%d_%d.jpg" % (self.epoch, i)))
-                    utils.save_image(final_gen_images_int[i],os.path.join(self.images_path,"hi_raw_images_ep%d_%d.jpg" % (self.epoch, i)))
+                    if config.save_plt:
+                        plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
+                        plt.savefig(os.path.join(self.images_path,"hi_plt_images_ep%d_%d.jpg" % (self.epoch, i)))
+                    if config.save_img:
+                        utils.save_image(final_gen_images_int[i],os.path.join(self.images_path,"hi_raw_images_ep%d_%d.jpg" % (self.epoch, i)))
 
             if self.epoch % sample_intervals == 0:
                 #create 2x2 images
-                self.save_imgs(epoch = self.epoch, final_images_stacked=final_images_stacked, domain=domain)
+                self.save_imgs()
 
             if self.epoch % save_intervals == 0:
                 #save last weights
@@ -1066,8 +1071,10 @@ class VAE():
         self.decoder.save_weights(filepath=os.path.join(self.model_path,"decoder_ep_{}.h5".format(self.epoch)))
         self.vae.save_weights(filepath=os.path.join(self.model_path,"vae_ep_{}.h5".format(self.epoch)))
 
-    def save_imgs(self, epoch, final_images_stacked, domain):
-        r, c = 2, 2
+    def save_imgs(self,grid=config.save_grid):
+        if grid is None:
+            return
+        r, c = grid
         gen_imgs = self.generate_random_images(r * c)
         fig, axs = plt.subplots(r, c)
         cnt = 0
@@ -1076,5 +1083,5 @@ class VAE():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,:])
                 axs[i,j].axis("off")
                 cnt += 1
-                fig.savefig(os.path.join(self.images_path, "image_%d.jpg" % epoch))
+                fig.savefig(os.path.join(self.images_path, "image_%d.jpg" % self.epoch))
         plt.close(fig)

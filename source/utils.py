@@ -17,6 +17,10 @@ def find_max_file(pattern,ext):
     if max is None: return None,None
     else: return max,(pattern+str(max)+ext)
 
+def pattern_files(pattern,ext):
+    for x in glob.glob(pattern+"*"+ext):
+        n = x[len(pattern):len(x)-len(ext)]
+        yield n
 
 def save_image(im,fn):
     img = Image.fromarray(im)
