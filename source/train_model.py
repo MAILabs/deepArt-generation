@@ -22,7 +22,7 @@ def main(model, epochs, batch_size, save_intervals):
     print("Python main program for generating images using {}".format(model))
 
     ## preprocess data images if init_train and save the images as pickle file
-    final_images_stacked = core.load_data()
+    final_images_stacked = core.load_data(my_model.rows)
 
     my_model.train(data = final_images_stacked, epochs = epochs, batch_size = batch_size, save_intervals = save_intervals, sample_intervals=save_intervals, hi_sample_intervals=save_intervals)
 

@@ -22,7 +22,6 @@ def resize_helper(img, min_vals = [128,128]):
     """
     return resize(image = img, output_shape = (min_vals[0], min_vals[1]), mode="reflect")
 
-
 def expander(x):
     """
     Add "observation dimension in order to vertical stack images"
@@ -80,7 +79,7 @@ def preprocess(genre_or_style, min_vals = [128,128], n=None,shuffle=True):
     ## might lead to bad result?! 
     
     # transform that each image has the shape (256,256,3)
-    all_images_ndarray_resized = list(map(resize_helper, all_images_ndarray))
+    all_images_ndarray_resized = list(map(lambda x: resize_helper(x,min_vals=min_vals), all_images_ndarray))
     
     del all_images_ndarray
     gc.collect()

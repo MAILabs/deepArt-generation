@@ -12,11 +12,13 @@ import numpy as np
 from vae import VAE
 from dcgan import DCGAN
 
-possible_models = ['DCGAN_1', 'DCGAN_2', 'DCGAN_3', 'VAE_1', 'VAE_2', 'VAE_3','VAE_4']
+possible_models = ['DCGAN_1', 'DCGAN_1X', 'DCGAN_2', 'DCGAN_3', 'VAE_1', 'VAE_2', 'VAE_3','VAE_4']
 
 def create_model(model=config.model):
     if model == 'DCGAN_1':
         my_model = DCGAN(name='DCGAN_1')
+    elif model == 'DCGAN_1X':
+        my_model = DCGAN(name='DCGAN_1X')
     elif model == 'DCGAN_2':
         my_model = DCGAN(name='DCGAN_2')
     elif model == 'DCGAN_3':
@@ -31,21 +33,21 @@ def create_model(model=config.model):
         my_model = VAE(name='VAE_4')
     else:
         my_model = VAE(name='VAE_2')
-        print('The selected model {} is not in the list [DCGAN_1, DCGAN_2, DCGAN_3, VAE_1, VAE_2, VAE_3, VAE_4]'.format(
+        print('The selected model {} is not in the list [DCGAN_1, DCGAN_1X, DCGAN_2, DCGAN_3, VAE_1, VAE_2, VAE_3, VAE_4]'.format(
             model))
     return my_model
 
 
-def load_data():
+def load_data(sz):
     """
     Load the dataset, either from source files, or from pre-prepared compressed numpy array
     If the pre-prepared file does not exist - create it
     """
-    img_filez = config.datafile("train_data_{}_{}.npz".format(config.category,config.num_images))
+    img_filez = config.datafile("train_data_{}_{}_{}.npz".format(config.category,sz,config.num_images))
     if not os.path.isfile(img_filez):
         print("Creating {} file for faster processing...".format(img_filez))
         print("Genre: {}, # of images = {}".format(config.category,config.num_images))
-        final_images_stacked = preprocess(genre_or_style=config.category, min_vals=[128,128],n=config.num_images)
+        final_images_stacked = preprocess(genre_or_style=config.category, min_vals=[sz,sz],n=config.num_images)
         np.savez_compressed(file=img_filez, a=final_images_stacked)
     else:
         print("Load preprocessed image data from {}".format(img_filez))

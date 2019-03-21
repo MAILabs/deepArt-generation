@@ -32,7 +32,7 @@ import utils
 
 class DCGAN(BaseModel):
     def __init__(self, name='DCGAN_1'):
-        assert any(name.upper() in item for item in ['DCGAN_1', 'DCGAN_2', 'DCGAN_3']), 'Inserted <name>: "{}" is not provided in the list [DCGAN_1, DCGAN_2, DCGAN_3]'.format(name)
+        assert any(name.upper() in item for item in ['DCGAN_1', 'DCGAN_1X', 'DCGAN_2', 'DCGAN_3']), 'Inserted <name>: "{}" is not provided in the list [DCGAN_1, DCGAN_1X, DCGAN_2, DCGAN_3]'.format(name)
         super().__init__(name)
 
         # Number of filters for discriminator and generator network
@@ -40,6 +40,7 @@ class DCGAN(BaseModel):
         self.nf2 = 64
         self.nf3 = 128
         self.nf4 = 256
+        self.nf5 = 512 # for hi-res
         # Latent vector Z with dimension 100
         self.latent_dim = 100
         if self.name == 'DCGAN_1': 
@@ -50,6 +51,17 @@ class DCGAN(BaseModel):
                                        optimizer = self.optimizer,
                                        metrics = ["accuracy"])
             self.generator = self.build_generator_1()
+        elif self.name == 'DCGAN_1X':
+                self.rows = 256
+                self.cols = 256
+                self.img_shape = (self.rows, self.cols, self.channels)
+                self.optimizer = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+                ## Build Discriminator and discriminator:
+                self.discriminator = self.build_discriminator_1x()
+                self.discriminator.compile(loss="binary_crossentropy",
+                                           optimizer=self.optimizer,
+                                           metrics=["accuracy"])
+                self.generator = self.build_generator_1x()
         elif self.name == 'DCGAN_2':
             self.optimizer = Adadelta()
             ## Build Discriminator and discriminator:
@@ -196,7 +208,132 @@ class DCGAN(BaseModel):
 
         return Model(inputs = latent_noise, outputs = generated_img)
     #####################################################################################
-    
+
+    ###################################### Model 1X ######################################
+
+    ## Discriminator network
+    def build_discriminator_1x(self):
+        discrim_model = Sequential()
+        # Layer 1:
+        # Input: 256x256x3
+        # Output: 128x128x32
+        discrim_model.add(
+            Conv2D(filters=self.nf1, kernel_size=(3, 3), strides=(2, 2), input_shape=self.img_shape, padding="same"))
+        discrim_model.add(LeakyReLU(alpha=0.2))
+        discrim_model.add(Dropout(rate=0.25))
+        # Layer 2:
+        # Input: 128x128x32
+        # Output: 64x64x64
+        discrim_model.add(Conv2D(filters=self.nf2, kernel_size=(3, 3), strides=(2, 2), padding="same"))
+        discrim_model.add(BatchNormalization(momentum=0.8))
+        discrim_model.add(LeakyReLU(alpha=0.2))
+        discrim_model.add(Dropout(rate=0.25))
+        # Layer 3:
+        # Input: 64x64x64
+        # Output: 32x32x128
+        discrim_model.add(Conv2D(filters=self.nf3, kernel_size=(3, 3), strides=(2, 2), padding="same"))
+        discrim_model.add(BatchNormalization(momentum=0.8))
+        discrim_model.add(LeakyReLU(alpha=0.2))
+        discrim_model.add(Dropout(rate=0.25))
+        # Layer 4:
+        # Input: 32x32x128
+        # Output: 16x16x256
+        discrim_model.add(Conv2D(filters=self.nf4, kernel_size=3, strides=2, padding="same"))
+        discrim_model.add(BatchNormalization(momentum=0.8))
+        discrim_model.add(LeakyReLU(alpha=0.2))
+        discrim_model.add(Dropout(rate=0.25))
+
+        # Layer 5:
+        # Input: 16x16x256
+        # Output: 8x8x512
+        discrim_model.add(Conv2D(filters=self.nf5, kernel_size=3, strides=2, padding="same"))
+        discrim_model.add(BatchNormalization(momentum=0.8))
+        discrim_model.add(LeakyReLU(alpha=0.2))
+        discrim_model.add(Dropout(rate=0.25))
+
+        # Output Layer:
+        # Input: (8*8*512, )
+        # Output: 1-dimensional probability
+        discrim_model.add(Flatten())
+        discrim_model.add(Dense(1, activation="sigmoid", name='classif_discrim'))
+
+        print("Architecture for discriminator network from model {}:".format(self.name))
+        print(discrim_model.summary())
+
+        ##Feed the discrimator with an image
+        img = Input(shape=self.img_shape)
+        classify_img = discrim_model(img)
+
+        return Model(inputs=img, outputs=classify_img)
+
+        ## Generator network
+
+    def build_generator_1x(self):
+        gen_model = Sequential()
+
+        # Layer 1:
+        # Input: random noise = 100
+        # Output: 8x8x512
+        gen_model.add(
+            Dense(units=8 * 8 * self.nf5, activation="relu", input_dim=self.latent_dim, name='latent_dim_sample'))
+        gen_model.add(Reshape((8, 8, self.nf5)))
+
+        # Layer 2
+        # Input:  8x8x512
+        # Output: 16x16x256
+        gen_model.add(UpSampling2D())
+        gen_model.add(Conv2D(filters=self.nf4, kernel_size=(3, 3), strides=(1, 1), padding="same"))
+        gen_model.add(BatchNormalization(momentum=0.8))
+        gen_model.add(Activation("relu"))
+
+        # Layer 3
+        # Input:  16x16x256
+        # Output: 32x32x128
+        gen_model.add(UpSampling2D())
+        gen_model.add(Conv2D(filters=self.nf3, kernel_size=(3, 3), strides=(1, 1), padding="same"))
+        gen_model.add(BatchNormalization(momentum=0.8))
+        gen_model.add(Activation("relu"))
+
+        # Layer 4
+        # Input: 32x32x128
+        # Output: 64x64x64
+        gen_model.add(UpSampling2D())
+        gen_model.add(Conv2D(filters=self.nf2, kernel_size=(3, 3), strides=(1, 1), padding="same"))
+        gen_model.add(BatchNormalization(momentum=0.8))
+        gen_model.add(Activation("relu"))
+
+        # Layer 5
+        # Input: 64x64x64
+        # Output: 128x128x16
+        gen_model.add(UpSampling2D())
+        gen_model.add(Conv2D(filters=self.nf1, kernel_size=(3, 3), strides=(1, 1), padding="same"))
+        gen_model.add(BatchNormalization(momentum=0.8))
+        gen_model.add(Activation("relu"))
+
+        # Layer 6
+        # Input: 128x128x16
+        # Output: 256x256x32
+        gen_model.add(UpSampling2D())
+        gen_model.add(Conv2D(filters=self.nf1, kernel_size=(3, 3), strides=(1, 1), padding="same"))
+        gen_model.add(BatchNormalization(momentum=0.8))
+        gen_model.add(Activation("relu"))
+
+        # Output Layer:
+        # Input: 256x256x32
+        # Output: 256x256x3
+        gen_model.add(Conv2D(filters=self.channels, kernel_size=3, padding="same"))
+        gen_model.add(Activation("tanh", name='generated_image'))
+
+        print("Architecture for generator network:")
+        print(gen_model.summary())
+
+        latent_noise = Input(shape=(self.latent_dim,))
+        generated_img = gen_model(latent_noise)
+
+        return Model(inputs=latent_noise, outputs=generated_img)
+
+    #####################################################################################
+
     ###################################### Model 2 ######################################
    ## Discriminator network
     def build_discriminator_2(self):
@@ -433,7 +570,7 @@ class DCGAN(BaseModel):
     def train(self, data, epochs = 100, batch_size = 10, save_intervals = 20, sample_intervals = 20, hi_sample_intervals = 20):
         final_images_stacked = data.astype('float32')
         self.domain = np.min(final_images_stacked), np.max(final_images_stacked)
-        if not self.domain == (-1,1) and self.name == 'DCGAN_1':
+        if not self.domain == (-1,1) and (self.name == 'DCGAN_1' or self.name == 'DCGAN_1X'):
             X_train = self.scale(x = data.astype('float32'), out_range=(-1,1))
         elif not self.domain == (0,1) and self.name == 'DCGAN_2':
             X_train = self.scale(x = data.astype('float32'), out_range=(0,1))
@@ -488,11 +625,12 @@ class DCGAN(BaseModel):
 
             if self.epoch % hi_sample_intervals == 0:
                 final_gen_images = self.generate_random_images(10)
-                if self.name == 'DCGAN_1' and self.domain==(-1,1):
-                    final_gen_images_int = ((final_gen_images+1)*127).astype(np.uint8)
-                    #else is sowieso in output range (0,1) wegen sigmoid
-                else:
-                    final_gen_images_int = (final_gen_images*255).astype(np.uint8)
+                #if (self.name == 'DCGAN_1' or self.name == 'DCGAN_1X'): # and self.domain==(-1,1):
+                #    final_gen_images_int = ((final_gen_images+1)*127).astype(np.uint8)
+                #    #else is sowieso in output range (0,1) wegen sigmoid
+                #else:
+                final_gen_images_int = (final_gen_images*255).astype(np.uint8)
+                print("Int dom = ({},{})".format(np.min(final_gen_images_int), np.max(final_gen_images_int)))
                 for i in range(10):
                     if config.save_plt:
                         plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
@@ -507,9 +645,14 @@ class DCGAN(BaseModel):
 
     def generate_images(self,noise):
         final_gen_images = self.generator.predict(noise)
-        if not self.domain == (-1, 1) and self.name == 'DCGAN_1':
+        print("Real dom = ({},{})".format(np.min(final_gen_images),np.max(final_gen_images)))
+        print("Self dom = {}".format(self.domain))
+        #if not self.domain == (-1, 1) and (self.name == 'DCGAN_1' or self.name == 'DCGAN_1X'):
+        #    final_gen_images = self.unscale(y=final_gen_images, out_range=(-1, 1))
+        if not self.domain == (-1, 1) and (self.name == 'DCGAN_1' or self.name == 'DCGAN_1X'):
             final_gen_images = self.unscale(y=final_gen_images, out_range=(-1, 1))
-        return final_gen_images # TODO: Not clear why in case of DCGAN_1 domain is -1,1 and not 0,1
+        print("After dom = ({},{})".format(np.min(final_gen_images), np.max(final_gen_images)))
+        return final_gen_images
 
     def generate_random_images(self,n):
         return self.generate_images(np.random.normal(0, 1, (n, self.latent_dim)))
