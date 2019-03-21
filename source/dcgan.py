@@ -20,6 +20,7 @@ from keras.models import Sequential, Model
 from keras.optimizers import Adam, Adadelta
 
 import numpy as np
+from basemodel import BaseModel
 
 #matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -29,22 +30,11 @@ import utils
 
 ## Build class for DCGAN
 
-class DCGAN():
+class DCGAN(BaseModel):
     def __init__(self, name='DCGAN_1'):
         assert any(name.upper() in item for item in ['DCGAN_1', 'DCGAN_2', 'DCGAN_3']), 'Inserted <name>: "{}" is not provided in the list [DCGAN_1, DCGAN_2, DCGAN_3]'.format(name)
-        self.name = name.upper()
-        self.model_path = os.path.join(config.models_dir,name,'etc')
-        self.images_path = os.path.join(config.models_dir, name, 'images')
-        if not os.path.exists(self.model_path):
-            os.makedirs(self.model_path)
-        if not os.path.exists(self.images_path):
-            os.makedirs(self.images_path)
-        # Input image shape
-        self.epoch = 0
-        self.rows = 128
-        self.cols = 128
-        self.channels = 3
-        self.img_shape = (self.rows, self.cols, self.channels)
+        super().__init__(name)
+
         # Number of filters for discriminator and generator network
         self.nf1 = 32
         self.nf2 = 64
@@ -87,6 +77,17 @@ class DCGAN():
             self.epoch=0
         else:
             self.generator.load_weights(filepath=os.path.join(self.model_path,"generator_ep_{}.h5".format(self.epoch)))
+            self.discriminator.load_weights(filepath=os.path.join(self.model_path, "discriminator_ep_{}.h5".format(self.epoch)))
+
+    def available_epochs(self):
+        return utils.pattern_files(os.path.join(self.model_path, "generator_ep_"), ".h5")
+
+    def load_epoch(self, epoch):
+        if epoch is None:
+            self.epoch = 0
+        else:
+            self.epoch = epoch
+            self.generator.load_weights(filepath=os.path.join(self.model_path, "generator_ep_{}.h5".format(self.epoch)))
             self.discriminator.load_weights(filepath=os.path.join(self.model_path, "discriminator_ep_{}.h5".format(self.epoch)))
 
         ## Class functions to build discriminator and generator (networks):
@@ -424,25 +425,6 @@ class DCGAN():
         print('Printing out stacked model %s' %self.name)
         print(stacked_G_D.summary())
         return stacked_G_D
-    
-    ## Helper for scaling and unscaling:
-    def scale(self, x, out_range = (-1, 1)):
-        domain = np.min(x), np.max(x)
-        # a)scale data such that its symmetric around 0
-        y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
-        # b)rescale data such that it falls into desired output range
-        y = y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
-
-        return y
-
-    def unscale(self, y, out_range = (-1, 1),domain=None):
-        if domain is None: domain = self.domain
-        # undo b)
-        z = (y - (out_range[1] + out_range[0]) / 2) / (out_range[1] - out_range[0])
-        # undo a)
-        z = z * (domain[1] - domain[0]) + (domain[1] + domain[0]) / 2
-
-        return z
 
     def summary(self):
         print('Model %s has the following architecture:' % self.name)
@@ -506,7 +488,7 @@ class DCGAN():
 
             if self.epoch % hi_sample_intervals == 0:
                 final_gen_images = self.generate_random_images(10)
-                if not self.domain == (-1,1) and self.name == 'DCGAN_1':
+                if self.name == 'DCGAN_1' and self.domain==(-1,1):
                     final_gen_images_int = ((final_gen_images+1)*127).astype(np.uint8)
                     #else is sowieso in output range (0,1) wegen sigmoid
                 else:
@@ -532,23 +514,3 @@ class DCGAN():
     def generate_random_images(self,n):
         return self.generate_images(np.random.normal(0, 1, (n, self.latent_dim)))
 
-    def save_imgs(self,grid=config.save_grid):
-        if grid is None:
-            return
-        r, c = grid
-        noise = np.random.normal(0, 1, (r * c, self.latent_dim))
-        gen_imgs = self.generator.predict(noise)
-        
-        #rescale to the input range
-        if not self.domain == (0,1):
-            gen_imgs = self.unscale(y = gen_imgs, out_range=(0,1))
-        # else will be anyways in range (0,1) because of sigmoid activation
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,:])
-                axs[i,j].axis("off")
-                cnt += 1
-        fig.savefig(os.path.join(self.images_path,"image_%d.jpg" % self.epoch))
-        plt.close(fig)

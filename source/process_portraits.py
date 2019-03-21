@@ -44,7 +44,6 @@ for i,im in enumerate(sel_images):
     im = imresize(im, (128,128))
     imsave(os.path.join(out_path, str(i) + '.png'), im)
 
-sel_images = list(map(lambda x: imresize(x,(32,32)),sel_images))
-sel_images = np.array(sel_images)
+sel_images = list(filter(lambda x: x.shape==(32,32,3),map(lambda x: imresize(x,(32,32)),sel_images)))
 
 np.savez_compressed(os.path.join(out_path,'wikiportraits.npz'),imgs=sel_images)

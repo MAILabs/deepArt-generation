@@ -22,6 +22,8 @@ parser.add_argument('--shuffle',dest='shuffle',default=False,const=True,action='
 parser.add_argument('--add-noise',dest='noise',default=False,const=True,action='store_const',help='add noise to input vector')
 parser.add_argument('--epocycle',dest='epocycle',default=False,const=True,action='store_const',help='do epoch cycle generation')
 parser.add_argument('--epoch',dest='epoch',default=None,type=int,help='specify exact epoch to use')
+parser.add_argument('--treshold',dest='treshold',default=0.95,type=float,help='treshold to select best images in DCGAN')
+
 
 args = parser.parse_args()
 
@@ -58,7 +60,29 @@ if "VAE" in args.model:
         if args.epoch is not None:
             m.load_epoch(args.epoch)
         main(m,vec)
-
-
+elif "DCGAN" in args.model:
+        batch_size=16
+        vec = np.zeros((args.n,m.latent_dim))
+        j=0
+        while j<args.n:
+            v = np.random.normal(0,1,(batch_size,m.latent_dim))
+            ims = m.generator.predict(v)
+            res = m.discriminator.predict(ims)
+            print("Computing batch, max prob={}".format(np.max(res)))
+            for i,(im,z) in enumerate(zip(ims,res)):
+                if z>=args.treshold:
+                    vec[j]=v[i]
+                    j+=1
+                    if j>=args.n:
+                        break
+        if args.epocycle:
+            eps = list(m.available_epochs())
+            for ep in eps:
+                m.load_epoch(ep)
+                main(m, vec)
+        else:
+            if args.epoch is not None:
+                m.load_epoch(args.epoch)
+            main(m, vec)
 else:
     print("Model type {} is not supported yet".format(args.model))

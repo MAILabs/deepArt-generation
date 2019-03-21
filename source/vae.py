@@ -20,20 +20,18 @@ import config
 import utils
 import matplotlib.pyplot as plt
 
+from basemodel import BaseModel
+
 #https://wiseodd.github.io/techblog/2016/12/10/variational-autoencoder/
 #https://distill.pub/2016/deconv-checkerboard/
 
 
-class VAE():
+class VAE(BaseModel):
     def __init__(self, name='VAE_1', use_mse=True):
         assert any(name.upper() in item for item in ['VAE_1', 'VAE_2', 'VAE_3', 'VAE_4']), 'Inserted <name>: "{}" is not provided in the list [VAE_1, VAE_2, VAE_3, VAE_4]'.format(name)
+        super().__init__(name)
         # Parameters
         self.use_mse = use_mse
-        self.name = name.upper()
-        self.rows = 128
-        self.cols = 128
-        self.channels = 3
-        self.img_shape = (self.rows, self.cols, self.channels)
         self.optimizer = Adadelta()
         self.intermediate_dim_1 = 256
         self.intermediate_dim_2 = 128
@@ -53,12 +51,6 @@ class VAE():
         self.nf6 = 8
         self.epoch = 0
         self.domain = (0,1)
-        self.model_path = os.path.join(config.models_dir,name,'etc')
-        self.images_path = os.path.join(config.models_dir, name, 'images')
-        if not os.path.exists(self.model_path):
-            os.makedirs(self.model_path)
-        if not os.path.exists(self.images_path):
-            os.makedirs(self.images_path)
 
         ## Placeholders
         self.vae_input = None
@@ -86,7 +78,6 @@ class VAE():
         self.vae.compile(optimizer=self.optimizer)
 
         self.epoch, _ = utils.find_max_file(os.path.join(self.model_path,"vae_ep_"),".h5")
-
         self.load_epoch(self.epoch)
 
     def load_epoch(self,epoch):
@@ -972,26 +963,6 @@ class VAE():
 
         return vae_loss
 
-    ## Helper for scaling and unscaling:
-    def scale(self, x, out_range = (0, 1)):
-        domain = np.min(x), np.max(x)
-        # a)scale data such that its symmetric around 0
-        y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
-        # b)rescale data such that it falls into desired output range
-        y = y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
-
-        return y
-
-    def unscale(self, y, out_range = (0, 1), domain = None):
-        if domain is None: domain = self.domain
-        # undo b)
-        z = (y - (out_range[1] + out_range[0]) / 2) / (out_range[1] - out_range[0])
-        # undo a)
-        z = z * (domain[1] - domain[0]) + (domain[1] + domain[0]) / 2
-
-        return z
-
-
     def summary(self):
         print('Using %s model with following architecture:' %self.name)
         print(self.vae.summary())
@@ -1027,14 +998,7 @@ class VAE():
             history_list.append("Epoch: %d %s loss: %f" % (self.epoch, self.name, vae_history))
             #If last epoch save models and generate 10 images in full mode:
             if self.epoch % hi_sample_intervals == 0:
-                final_gen_images = self.generate_random_images(10)
-                final_gen_images_int = (final_gen_images*256.0).astype(np.uint8)
-                for i in range(10):
-                    if config.save_plt:
-                        plt.imshow(final_gen_images[i, :, :, :], interpolation = "nearest")
-                        plt.savefig(os.path.join(self.images_path,"hi_plt_images_ep%d_%d.jpg" % (self.epoch, i)))
-                    if config.save_img:
-                        utils.save_image(final_gen_images_int[i],os.path.join(self.images_path,"hi_raw_images_ep%d_%d.jpg" % (self.epoch, i)))
+                self.save_samples(10)
 
             if self.epoch % sample_intervals == 0:
                 #create 2x2 images
@@ -1070,18 +1034,3 @@ class VAE():
         self.encoder.save_weights(filepath=os.path.join(self.model_path,"encoder_ep_{}.h5".format(self.epoch)))
         self.decoder.save_weights(filepath=os.path.join(self.model_path,"decoder_ep_{}.h5".format(self.epoch)))
         self.vae.save_weights(filepath=os.path.join(self.model_path,"vae_ep_{}.h5".format(self.epoch)))
-
-    def save_imgs(self,grid=config.save_grid):
-        if grid is None:
-            return
-        r, c = grid
-        gen_imgs = self.generate_random_images(r * c)
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,:])
-                axs[i,j].axis("off")
-                cnt += 1
-                fig.savefig(os.path.join(self.images_path, "image_%d.jpg" % self.epoch))
-        plt.close(fig)
