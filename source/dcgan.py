@@ -502,7 +502,7 @@ class DCGAN():
 
             if self.epoch % sample_intervals == 0:
                 #create 2x2 images
-                self.save_imgs(epoch = self.epoch)
+                self.save_imgs()
 
             if self.epoch % hi_sample_intervals == 0:
                 final_gen_images = self.generate_random_images(10)
@@ -540,9 +540,9 @@ class DCGAN():
         gen_imgs = self.generator.predict(noise)
         
         #rescale to the input range
-        if not self.domain == (-1,1):
+        if not self.domain == (0,1):
             gen_imgs = self.unscale(y = gen_imgs, out_range=(0,1))
-            # else will be anyways in range (0,1) because of sigmoid activation
+        # else will be anyways in range (0,1) because of sigmoid activation
         fig, axs = plt.subplots(r, c)
         cnt = 0
         for i in range(r):

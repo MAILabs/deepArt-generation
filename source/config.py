@@ -12,6 +12,8 @@ save_grid = (2,2) # or None
 
 min_img_ratio = 0.7
 max_img_ratio = 1.4
+min_prefix_no = 0
+max_perfix_no = 8300
 
 import os
 
