@@ -69,6 +69,7 @@ elif "DCGAN" in args.model:
             ims = m.generator.predict(v)
             res = m.discriminator.predict(ims)
             print("Computing batch, max prob={}".format(np.max(res)))
+            print(res)
             for i,(im,z) in enumerate(zip(ims,res)):
                 if z>=args.treshold:
                     vec[j]=v[i]

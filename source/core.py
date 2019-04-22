@@ -12,28 +12,30 @@ import numpy as np
 from vae import VAE
 from dcgan import DCGAN
 
-possible_models = ['DCGAN_1', 'DCGAN_1X', 'DCGAN_2', 'DCGAN_3', 'VAE_1', 'VAE_2', 'VAE_3','VAE_4']
+possible_models = ['DCGAN_1', 'DCGAN_1X', 'DCGAN_1XX', 'DCGAN_2', 'DCGAN_3', 'VAE_1', 'VAE_2', 'VAE_3','VAE_4']
 
-def create_model(model=config.model):
+def create_model(model=config.model,category=config.category):
     if model == 'DCGAN_1':
-        my_model = DCGAN(name='DCGAN_1')
+        my_model = DCGAN(name='DCGAN_1',category=category)
     elif model == 'DCGAN_1X':
-        my_model = DCGAN(name='DCGAN_1X')
+        my_model = DCGAN(name='DCGAN_1X',category=category)
+    elif model == 'DCGAN_1XX':
+        my_model = DCGAN(name='DCGAN_1XX',category=category)
     elif model == 'DCGAN_2':
-        my_model = DCGAN(name='DCGAN_2')
+        my_model = DCGAN(name='DCGAN_2',category=category)
     elif model == 'DCGAN_3':
-        my_model = DCGAN(name='DCGAN_3')
+        my_model = DCGAN(name='DCGAN_3',category=category)
     elif model == 'VAE_1':
-        my_model = VAE(name='VAE_1')
+        my_model = VAE(name='VAE_1',category=category)
     elif model.upper() == 'VAE_2':
-        my_model = VAE(name='VAE_2')
+        my_model = VAE(name='VAE_2',category=category)
     elif model == 'VAE_3':
-        my_model = VAE(name='VAE_3')
+        my_model = VAE(name='VAE_3',category=category)
     elif model == 'VAE_4':
-        my_model = VAE(name='VAE_4')
+        my_model = VAE(name='VAE_4',category=category)
     else:
-        my_model = VAE(name='VAE_2')
-        print('The selected model {} is not in the list [DCGAN_1, DCGAN_1X, DCGAN_2, DCGAN_3, VAE_1, VAE_2, VAE_3, VAE_4]'.format(
+        my_model = VAE(name='VAE_2',category=category)
+        print('The selected model {} is not in the list [DCGAN_1, DCGAN_1X, DCGAN_1XX, DCGAN_2, DCGAN_3, VAE_1, VAE_2, VAE_3, VAE_4]'.format(
             model))
     return my_model
 

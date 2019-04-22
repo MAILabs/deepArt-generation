@@ -47,6 +47,10 @@ def preprocess(genre_or_style, min_vals = [128,128], n=None,shuffle=True):
     for x in all_images:
         if n is not None and i>=n:
             break
+        # figure out prefix
+        pfx = int(x[:x.find('-')])
+        if config.min_prefix_no is not None and pfx < config.min_prefix_no: continue
+        if config.max_prefix_no is not None and pfx > config.max_prefix_no: continue
         try:
             im = io.imread(os.path.join(path,x))
             shape = im.shape

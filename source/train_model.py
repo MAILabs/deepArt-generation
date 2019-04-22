@@ -15,11 +15,11 @@ import core
 import os
 import argparse
 
-def main(model, epochs, batch_size, save_intervals):
+def main(model, epochs, batch_size, save_intervals,category):
 
-    my_model = core.create_model(model)
+    my_model = core.create_model(model,category)
 
-    print("Python main program for generating images using {}".format(model))
+    print("Python main program for generating images using {} with category {}".format(model,category))
 
     ## preprocess data images if init_train and save the images as pickle file
     final_images_stacked = core.load_data(my_model.rows)
@@ -34,10 +34,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Art Network Trainer')
     parser.add_argument('--model', dest='model', default=config.model, help='model to use',
                         choices=core.possible_models)
+    parser.add_argument('--category', dest='category', default=config.category, help='category of painting to use (from the data dir subdirs)')
     parser.add_argument('--epochs', dest='epochs', default=10000, help='number of epochs', type=int)
     parser.add_argument('--batch-size', dest='batch_size', default=16, help='minibatch size', type=int)
     parser.add_argument('--save-intervals', dest='save_intervals', default=500, help='save intervals', type=int)
 
     args = parser.parse_args()
 
-    main(model=args.model, epochs=args.epochs, batch_size=args.batch_size, save_intervals=args.save_intervals)
+    main(model=args.model, epochs=args.epochs, batch_size=args.batch_size, save_intervals=args.save_intervals, category=args.category)

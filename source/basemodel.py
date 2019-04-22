@@ -17,10 +17,11 @@ import utils
 ## Build class for DCGAN
 
 class BaseModel():
-    def __init__(self, name):
+    def __init__(self, name, category=None):
         self.name = name.upper()
-        self.model_path = os.path.join(config.models_dir, name, 'etc')
-        self.images_path = os.path.join(config.models_dir, name, 'images')
+        dirname = "{}-{}".format(name,category) if category is not None else name
+        self.model_path = os.path.join(config.models_dir, dirname, 'etc')
+        self.images_path = os.path.join(config.models_dir, dirname, 'images')
         if not os.path.exists(self.model_path):
             os.makedirs(self.model_path)
         if not os.path.exists(self.images_path):

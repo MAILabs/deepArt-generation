@@ -27,9 +27,9 @@ from basemodel import BaseModel
 
 
 class VAE(BaseModel):
-    def __init__(self, name='VAE_1', use_mse=True):
+    def __init__(self, name='VAE_1', category=config.category, use_mse=True):
         assert any(name.upper() in item for item in ['VAE_1', 'VAE_2', 'VAE_3', 'VAE_4']), 'Inserted <name>: "{}" is not provided in the list [VAE_1, VAE_2, VAE_3, VAE_4]'.format(name)
-        super().__init__(name)
+        super().__init__(name,category)
         # Parameters
         self.use_mse = use_mse
         self.optimizer = Adadelta()
